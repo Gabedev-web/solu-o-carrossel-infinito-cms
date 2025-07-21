@@ -1,0 +1,241 @@
+<!-- CÓDIGO PARA LOOP INFINITO SUAVE - VERSÃO CORRIGIDA -->
+<!-- Cole em Project Settings > Custom Code > Before </body> tag -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Iniciando slider infinito...');
+    
+    // Aguarda os sliders carregarem
+    setTimeout(initializeInfiniteSliders, 1000);
+});
+
+function initializeInfiniteSliders() {
+    // Pega TODOS os sliders da página
+    const allSliders = document.querySelectorAll('._w-slide.w-slider');
+    
+    console.log(`Encontrados ${allSliders.length} sliders`);
+    
+    // Aplica o loop infinito em cada slider
+    allSliders.forEach((slider, index) => {
+        console.log(`Configurando slider ${index + 1}`);
+        makeSliderInfinite(slider, index);
+    });
+}
+
+function makeSliderInfinite(sliderElement, sliderIndex) {
+    // Encontra o mask e os slides
+    const mask = sliderElement.querySelector('._w-slider-mask.w-slider-mask');
+    const slides = mask.querySelectorAll('.testimonial24_slide.w-slide');
+    const leftArrow = sliderElement.querySelector('.w-slider-arrow-left');
+    const rightArrow = sliderElement.querySelector('.w-slider-arrow-right');
+    
+    if (!mask || slides.length === 0) {
+        console.error('Elementos do slider não encontrados');
+        return;
+    }
+    
+    console.log(`Slider ${sliderIndex + 1} tem ${slides.length} slides`);
+    
+    // Configurações responsivas
+    const isMobile = window.innerWidth <= 767;
+    const isTablet = window.innerWidth > 767 && window.innerWidth <= 991;
+    
+    let slidesVisibles = 3; // Desktop
+    if (isMobile) slidesVisibles = 1; // Mobile
+    else if (isTablet) slidesVisibles = 2; // Tablet
+    
+    const slideWidth = 100 / slidesVisibles;
+    
+    // Remove o comportamento padrão do Webflow
+    if (leftArrow) {
+        const newLeftArrow = leftArrow.cloneNode(true);
+        leftArrow.parentNode.replaceChild(newLeftArrow, leftArrow);
+        
+        newLeftArrow.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            moveSlider('prev', mask, slides.length);
+        });
+    }
+    
+    if (rightArrow) {
+        const newRightArrow = rightArrow.cloneNode(true);
+        rightArrow.parentNode.replaceChild(newRightArrow, rightArrow);
+        
+        newRightArrow.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            moveSlider('next', mask, slides.length);
+        });
+    }
+    
+    // Clona os slides para criar o efeito infinito
+    const slidesToClone = Math.min(slidesVisibles * 2, slides.length);
+    
+    // Clona os primeiros slides e adiciona no final
+    for (let i = 0; i < slidesToClone; i++) {
+        const clone = slides[i].cloneNode(true);
+        clone.setAttribute('data-cloned', 'end');
+        clone.setAttribute('aria-hidden', 'true');
+        mask.appendChild(clone);
+    }
+    
+    // Clona os últimos slides e adiciona no início
+    for (let i = slides.length - slidesToClone; i < slides.length; i++) {
+        const clone = slides[i].cloneNode(true);
+        clone.setAttribute('data-cloned', 'start');
+        clone.setAttribute('aria-hidden', 'true');
+        mask.insertBefore(clone, mask.firstChild);
+    }
+    
+    // Configura a posição inicial
+    const initialOffset = slidesToClone * slideWidth;
+    let currentPosition = initialOffset;
+    
+    // Define estilos CSS para o slider
+    mask.style.display = 'flex';
+    mask.style.flexWrap = 'nowrap';
+    mask.style.transition = 'transform 0.5s ease';
+    mask.style.transform = `translateX(-${currentPosition}%)`;
+    
+    // Ajusta todos os slides
+    const allSlides = mask.querySelectorAll('.w-slide');
+    allSlides.forEach(slide => {
+        if (window.innerWidth > 991) {
+            slide.style.flex = `0 0 ${slideWidth}%`;
+            slide.style.maxWidth = `${slideWidth}%`;
+            slide.style.padding = '0 10px';
+        }
+        slide.style.boxSizing = 'border-box';
+    });
+    
+    // Armazena dados no elemento para uso posterior
+    mask.setAttribute('data-current-position', currentPosition);
+    mask.setAttribute('data-slide-width', slideWidth);
+    mask.setAttribute('data-slides-to-clone', slidesToClone);
+    mask.setAttribute('data-original-slides', slides.length);
+}
+
+function moveSlider(direction, mask, originalSlidesCount) {
+    let currentPosition = parseFloat(mask.getAttribute('data-current-position')) || 0;
+    const slideWidth = parseFloat(mask.getAttribute('data-slide-width')) || 33.33;
+    const slidesToClone = parseInt(mask.getAttribute('data-slides-to-clone')) || 3;
+    
+    // Ajusta slideWidth baseado no dispositivo
+    const isMobile = window.innerWidth <= 767;
+    const isTablet = window.innerWidth > 767 && window.innerWidth <= 991;
+    
+    let actualSlideWidth = slideWidth;
+    if (isMobile) actualSlideWidth = 100;
+    else if (isTablet) actualSlideWidth = 50;
+    
+    // Move o slider
+    if (direction === 'next') {
+        currentPosition += actualSlideWidth;
+    } else {
+        currentPosition -= actualSlideWidth;
+    }
+    
+    // Aplica a transformação
+    mask.style.transform = `translateX(-${currentPosition}%)`;
+    
+    // Atualiza a posição armazenada
+    mask.setAttribute('data-current-position', currentPosition);
+    
+    // Verifica se precisa fazer o loop
+    const maxPosition = (originalSlidesCount + slidesToClone) * actualSlideWidth;
+    const minPosition = (slidesToClone - 1) * actualSlideWidth;
+    
+    // Se chegou no final, volta para a posição equivalente no início
+    if (currentPosition > maxPosition - actualSlideWidth) {
+        setTimeout(() => {
+            mask.style.transition = 'none';
+            currentPosition = currentPosition - (originalSlidesCount * actualSlideWidth);
+            mask.style.transform = `translateX(-${currentPosition}%)`;
+            mask.setAttribute('data-current-position', currentPosition);
+            
+            setTimeout(() => {
+                mask.style.transition = 'transform 0.5s ease';
+            }, 50);
+        }, 500);
+    }
+    
+    // Se chegou no início, vai para a posição equivalente no final
+    if (currentPosition < minPosition) {
+        setTimeout(() => {
+            mask.style.transition = 'none';
+            currentPosition = currentPosition + (originalSlidesCount * actualSlideWidth);
+            mask.style.transform = `translateX(-${currentPosition}%)`;
+            mask.setAttribute('data-current-position', currentPosition);
+            
+            setTimeout(() => {
+                mask.style.transition = 'transform 0.5s ease';
+            }, 50);
+        }, 500);
+    }
+}
+
+// CSS adicional para garantir que funcione
+const style = document.createElement('style');
+style.textContent = `
+    /* Remove estilos conflitantes do Webflow */
+    ._w-slider-mask.w-slider-mask {
+        overflow: visible !important;
+        position: relative !important;
+        height: auto !important;
+    }
+    
+    ._w-slide.w-slider {
+        overflow: hidden !important;
+        position: relative !important;
+    }
+    
+    .testimonial24_slide.w-slide {
+        position: relative !important;
+        display: block !important;
+        text-align: left !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+    
+    /* Garante que os cards mantenham seu estilo */
+    .team-card {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* Remove dots se você não quiser */
+    .testimonial24_slide-nav {
+        display: none !important;
+    }
+    
+    /* AJUSTES APENAS PARA MOBILE - SEM QUEBRAR O FUNCIONAMENTO */
+    /* Mobile Portrait */
+    @media (max-width: 478px) {
+        .testimonial24_slide.w-slide {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+            padding: 0 20px !important;
+        }
+    }
+    
+    /* Mobile Landscape e Tablet Portrait */
+    @media (min-width: 479px) and (max-width: 767px) {
+        .testimonial24_slide.w-slide {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+            padding: 0 20px !important;
+        }
+    }
+    
+    /* Tablet Landscape */
+    @media (min-width: 768px) and (max-width: 991px) {
+        .testimonial24_slide.w-slide {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+        }
+    }
+`;
+document.head.appendChild(style);
+</script>
